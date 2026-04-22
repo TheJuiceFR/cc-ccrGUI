@@ -1,3 +1,4 @@
+local ccr = require("/lib/ccr")
 
 local pbg=term.getBackgroundColor()
 local pfg=term.getTextColor()
@@ -52,14 +53,15 @@ function rebuildItem(self)
 end
 
 for k,v in pairs(db) do
-	local ind=#scrollwin.subitems+1
-	local out=window.create(scrollwin,1,ind,w-1,1)
-	out.index=ind
-	out.text=k
-	out.installed=ldb[k]~=nil
-	out.selected=false
-	out.rebuild=rebuildItem
-	scrollwin.subitems[ind]=out
+	if k ~= "ccr" then --Lets just not give the option to delete ccr
+		local ind=#scrollwin.subitems+1
+		local out=window.create(scrollwin,1,ind,w-1,1)
+		out.text=k
+		out.installed=ldb[k]~=nil
+		out.selected=false
+		out.rebuild=rebuildItem
+		scrollwin.subitems[ind]=out
+	end
 end
 
 
@@ -151,6 +153,8 @@ scrollbar.grabbed=false
 function scrollbar.rebuild()
 	scrollbar.clear()
 	w,h=scrollbar.getSize()
+	if scrollbar.position > h - 3 then scrollbar.position = h - 3 end
+	
 	scrollbar.setCursorPos(1,1)
 	scrollbar.blit(up,'f','8')
 	
@@ -195,10 +199,10 @@ function refresh()
 	t.setCursorPos(w,1)
 	t.blit("X","f","e")
 	
-	scrollwin.reposition(1,2,w-1,h-1)
 	scrollbar.reposition(w,2,1,h-1)
-	scrollwin.rebuild()
+	scrollwin.reposition(1,2,w-1,h-1)
 	scrollbar.rebuild()
+	scrollwin.rebuild()
 end
 refresh()
 
@@ -247,23 +251,21 @@ term.setCursorPos(1,1)
 
 if confirm then
 	print("updating...")
-	for k,v in pairs(ldb) do
-		if not db[k] then
-			print("'"..k.."' is not in main database; skipping")
-		elseif v.version~=db[k].version then
-			print(k..": "..v.version.." > "..db[k].version)
-			ccr.install(k)
-		end
-	end
-	print("update complete")
+	shell.run("ccr update")
 	
 	for k,v in pairs(scrollwin.subitems) do
 		if v.selected then
 			if v.installed then
-				ccr.remove(v.text,1)
+				local succ, reason = ccr.remove(v.text,1)
+				if not succ then print(reason) end
 			else
-				ccr.install(v.text,1)
+				local succ, reason = ccr.installTree(v.text,2)
+				if not succ then print(reason) end
 			end
 		end
 	end
+	ccr.clearCache()
+	shell.run("/startup/ccr.lua")
 end
+
+print("Thank you for using ccrGUI!")
